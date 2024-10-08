@@ -3,6 +3,8 @@
 
 [Project Page](https://dataenvgym.github.io/)
 
+![DataEnvGym Teaser](assets/dataenv_gym_teaser.png)
+
 `DataEnvGym` provides building blocks and patterns for creating and evaluating data generation agents and environments.
 
 Useful features:
