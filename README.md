@@ -134,3 +134,11 @@ CUDA_VISIBLE_DEVICES=<...> python examples/math/open_ended_environment.py
 
 # Feature Requests
 If there's anything you'd like to see added, please open an issue. PRs are welcome!
+
+# Acknowledgements
+This repository uses code from the following repositories:
+- [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
+- [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness)
+- [LiveCodeBench](https://github.com/LiveCodeBench/LiveCodeBench)
+
+We thank the authors of the above repositories for making their code freely available.
