@@ -142,3 +142,14 @@ This repository uses code from the following repositories:
 - [LiveCodeBench](https://github.com/LiveCodeBench/LiveCodeBench)
 
 We thank the authors of the above repositories for making their code freely available.
+
+# Citation
+If you find this repository useful, please consider citing:
+```bibtex
+@article{khan2024dataenvgym,
+  title={DataEnvGym: Data Generation Agents in Teacher Environments with Student Feedback},
+  author={Khan, Zaid and Stengel-Eskin, Elias and Cho, Jaemin and Bansal, Mohit},
+  journal={arXiv preprint arXiv:2410.06215},
+  year={2024}
+}
+```
