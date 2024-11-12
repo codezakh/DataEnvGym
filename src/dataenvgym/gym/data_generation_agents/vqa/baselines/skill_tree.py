@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from tenacity import RetryError, retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
 from ulid import ULID
+import openai
 
 from dataenvgym.gym.data_generation_agents.skill_tree import (
     QualityCheckerInterface,
@@ -101,7 +102,9 @@ class GqaExample(BaseModel):
 class DataGenerationAgent:
     def __init__(
         self,
-        model: Literal["gpt-4o", "gpt-4o-mini"] = "gpt-4o",
+        model: Literal[
+            "gpt-4o", "gpt-4o-mini", "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo"
+        ] = "gpt-4o",
         template: jinja2.Template = GENERATE_DATA_FOR_SUBSKILL_TEMPLATE,
         text_to_image_fn: Callable[[str], SerializableImage] = RandomImageGenerator(),
         num_examples: int = 10,
@@ -125,6 +128,14 @@ class DataGenerationAgent:
                     api_version="2023-03-15-preview",
                 )
             )
+        elif self.model == "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo":
+            client = openai.OpenAI(
+                base_url="https://api.together.xyz/v1",
+                api_key=os.environ["TOGETHER_API_KEY"],
+            )
+            self.client = instructor.from_openai(client, mode=instructor.Mode.TOOLS)
+        else:
+            raise ValueError(f"Unknown model: {self.model}")
         self.template = template
         self.model = model
         # Just a way to ensure we get one example per question type.

@@ -2,6 +2,7 @@ import os
 import random
 from pathlib import Path
 from typing import Collection, Iterable, Literal, Sequence, cast
+import openai
 
 import instructor
 import jinja2
@@ -55,10 +56,13 @@ class DataGenerationAgent:
         logging_folder: Path,
         data_specs_per_llm_call: int = 10,
         num_training_data_per_invocation: int = 120,
-        model: Literal["gpt-4o", "gpt-4o-mini"] = "gpt-4o",
+        model: Literal[
+            "gpt-4o", "gpt-4o-mini", "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo"
+        ] = "gpt-4o",
+        num_examples_for_datagen_prompt: int = 3,
     ):
         self.model = model
-        self.model = model
+        self.num_examples_for_datagen_prompt = num_examples_for_datagen_prompt
         if self.model == "gpt-4o":
             self.client = instructor.patch(
                 AzureOpenAI(
@@ -75,6 +79,14 @@ class DataGenerationAgent:
                     api_version="2023-03-15-preview",
                 )
             )
+        elif self.model == "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo":
+            client = openai.OpenAI(
+                base_url="https://api.together.xyz/v1",
+                api_key=os.environ["TOGETHER_API_KEY"],
+            )
+            self.client = instructor.from_openai(client, mode=instructor.Mode.TOOLS)
+        else:
+            raise ValueError(f"Unknown model: {self.model}")
         self.generation_index = 0
         # We will randomly sample from these to generate training data,
         # these will serve as in-context examples for the data generating LLM.
@@ -102,9 +114,9 @@ class DataGenerationAgent:
         self,
         errors: Sequence[CompletedMathTaskInstance],
     ) -> str:
-        in_context_examples = random.sample(self.task_instances, k=3) + random.sample(
-            errors, k=3
-        )
+        in_context_examples = random.sample(
+            self.task_instances, k=self.num_examples_for_datagen_prompt
+        ) + random.sample(errors, k=self.num_examples_for_datagen_prompt)
         random.shuffle(in_context_examples)
         return DEFAULT_TEMPLATE.render(
             num_data_specs=self.data_specs_per_llm_call,

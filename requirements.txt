@@ -33,6 +33,7 @@ colorful==0.5.6
 comm==0.2.2
 contourpy==1.2.1
 cycler==0.12.1
+-e git+ssh://git@github.com/codezakh/11-envgen-pp.git@1e33f4ab3562efbb25cbf5d87af4de9c557817da#egg=dataenvgym
 datasets==2.21.0
 debugpy==1.8.1
 decorator==5.1.1
@@ -47,7 +48,7 @@ docker-pycreds==0.4.0
 docstring_parser==0.16
 einops==0.8.0
 email_validator==2.1.1
--e git+ssh://git@github.com/codezakh/11-envgen-pp.git@46fdc5482fabe645bc21fc6026acd7405673490c#egg=envgenpp
+-e git+ssh://git@github.com/codezakh/11-envgen-pp.git@1e33f4ab3562efbb25cbf5d87af4de9c557817da#egg=envgenpp
 exceptiongroup==1.2.2
 executing==2.0.1
 fastapi==0.112.2
@@ -114,7 +115,7 @@ lark==1.2.2
 lazy_loader==0.4
 librosa==0.10.2.post1
 linkify-it-py==2.0.3
--e git+ssh://git@github.com/codezakh/11-envgen-pp.git@46fdc5482fabe645bc21fc6026acd7405673490c#egg=llamafactory&subdirectory=src/external/LLaMA-Factory
+-e git+ssh://git@github.com/codezakh/11-envgen-pp.git@1e33f4ab3562efbb25cbf5d87af4de9c557817da#egg=llamafactory&subdirectory=src/external/LLaMA-Factory
 llvmlite==0.43.0
 lm-format-enforcer==0.10.6
 loguru==0.7.2
@@ -170,6 +171,7 @@ pandocfilters==1.5.1
 parso==0.8.4
 partial-json-parser==0.2.1.1.post4
 pathspec==0.12.1
+Pebble==5.0.7
 peft==0.12.0
 pexpect==4.9.0
 pillow==10.4.0
@@ -196,6 +198,7 @@ pycparser==2.22
 pydantic==2.8.2
 pydantic_core==2.20.1
 pydub==0.25.1
+pyext==0.7
 Pygments==2.18.0
 pyparsing==3.1.2
 pytest==8.2.1
