@@ -33,6 +33,7 @@ from argparse import ArgumentParser
 import json
 import sys
 import sh
+from huggingface_hub import hf_hub_download
 
 LiveCodeBenchSplitChoices = Literal["val", "test", "debug", "single"]
 
@@ -62,10 +63,19 @@ def load_split(split: LiveCodeBenchSplitChoices) -> list[CodeGenerationProblem]:
 
 
 def load_solutions() -> dict[str, str]:
-    with open(
-        "workspace/notebooks__013_get_ground_truth_solutions_for_lcb/solution_for_each_qid.json",
-        "r",
-    ) as f:
+    # with open(
+    #     "workspace/notebooks__013_get_ground_truth_solutions_for_lcb/solution_for_each_qid.json",
+    #     "r",
+    # ) as f:
+    #     solutions = json.load(f)
+
+    solutions_path = hf_hub_download(
+        repo_id="codezakh/dataenvgym-livecodebench-solutions",
+        filename="solution_for_each_qid.json",
+        repo_type="dataset",
+    )
+
+    with open(solutions_path, "r") as f:
         solutions = json.load(f)
 
     return {qid: _["passing_solution"] for qid, _ in solutions.items()}
