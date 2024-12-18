@@ -9,6 +9,8 @@ from typing import (
     Optional,
     Type,
     TypeVar,
+    cast,
+    get_args,
 )
 
 from pydantic import BaseModel
@@ -151,3 +153,139 @@ class JSONLinesKeyValueCache(MutableMapping[ULID, T], Generic[T]):
 
     def __len__(self) -> int:
         return len(self.data)
+
+
+def extract_code_in_markdown_backticks(model_output: str) -> str:
+    outputlines = model_output.split("\n")
+    # Find the first line that starts with ```
+    opening_backticks_idx = next(
+        (i for i, line in enumerate(outputlines) if line.startswith("```")), None
+    )
+    if opening_backticks_idx is None:
+        # We don't know what to do, so just return the whole thing.
+        return "\n".join(outputlines)
+
+    # Find the line that contains the closing code block.
+    closing_backticks_idx = next(
+        (
+            i
+            for i, line in enumerate(outputlines[opening_backticks_idx:])
+            if line.endswith("```")
+        ),
+        None,
+    )
+
+    if closing_backticks_idx is None:
+        # We don't know what to do, so just return the whole thing.
+        return "\n".join(outputlines)
+
+    # If there isn't any code between them, return the whole thing.
+    if opening_backticks_idx + 1 >= closing_backticks_idx:
+        return "\n".join(outputlines)
+
+    return "\n".join(outputlines[opening_backticks_idx + 1 : closing_backticks_idx])
+
+
+from sqlalchemy import create_engine, Column, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, scoped_session
+
+Base = declarative_base()
+
+
+class KeyValueModel(Base):
+    __tablename__ = "key_value_store"
+    key = Column(String, primary_key=True, nullable=False)
+    value = Column(String, nullable=False)
+
+
+class SqliteKeyValueStore:
+    def __init__(self, db_url: str = "sqlite:///key_value_store.db"):
+        self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        Base.metadata.create_all(self.engine)
+        self.Session = scoped_session(sessionmaker(bind=self.engine))
+
+    def set(self, key: str, value: str):
+        session = self.Session()
+        try:
+            existing_entry = session.query(KeyValueModel).filter_by(key=key).first()
+            if existing_entry:
+                existing_entry.value = value  # type: ignore
+            else:
+                new_entry = KeyValueModel(key=key, value=value)
+                session.add(new_entry)
+            session.commit()
+        finally:
+            session.close()
+
+    def get(self, key: str) -> Optional[str]:
+        session = self.Session()
+        try:
+            entry = session.query(KeyValueModel).filter_by(key=key).first()
+            return cast(str, entry.value) if entry else None
+        finally:
+            session.close()
+
+    def delete(self, key: str) -> None:
+        session = self.Session()
+        try:
+            session.query(KeyValueModel).filter_by(key=key).delete()
+            session.commit()
+        finally:
+            session.close()
+
+    def keys(self) -> list[str]:
+        session = self.Session()
+        try:
+            return cast(
+                list[str], [entry.key for entry in session.query(KeyValueModel).all()]
+            )
+        finally:
+            session.close()
+
+    def values(self) -> list[str]:
+        session = self.Session()
+        try:
+            return cast(
+                list[str], [entry.value for entry in session.query(KeyValueModel).all()]
+            )
+        finally:
+            session.close()
+
+    def items(self) -> list[tuple[str, str]]:
+        session = self.Session()
+        try:
+            return cast(
+                list[tuple[str, str]],
+                [
+                    (entry.key, entry.value)
+                    for entry in session.query(KeyValueModel).all()
+                ],
+            )
+        finally:
+            session.close()
+
+
+class PydanticSqliteKeyValueStore(MutableMapping[str, T], Generic[T]):
+    def __init__(self, model: Type[T], db_url: str = "sqlite:///key_value_store.db"):
+        self.db_url = db_url
+        self.store = SqliteKeyValueStore(db_url)
+        self.model = model
+
+    def __getitem__(self, key: str) -> T:
+        value = self.store.get(key)
+        if value is None:
+            raise KeyError(f"Key {key} not found in store")
+        return self.model.model_validate_json(value)
+
+    def __setitem__(self, key: str, value: T) -> None:
+        self.store.set(key, value.model_dump_json())
+
+    def __delitem__(self, key: str) -> None:
+        self.store.delete(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.store.keys())
+
+    def __len__(self) -> int:
+        return len(self.store.keys())

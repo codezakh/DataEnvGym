@@ -26,7 +26,7 @@ UNC_NLP_LAYOUT = MachineSpecificGqaLayout(
     gqa_images_abspath="/nas-ssd/zaidkhan/datasets/gqa/images",
 )
 
-GqaSplitChoices = Literal["val", "testdev", "debug"]
+GqaSplitChoices = Literal["val", "testdev", "debug", "train_100k"]
 
 
 def load_gqa_split(split: GqaSplitChoices) -> Collection[GqaRecord]:
@@ -46,6 +46,11 @@ def load_gqa_split(split: GqaSplitChoices) -> Collection[GqaRecord]:
             split_path = "/nas-ssd/zaidkhan/envgenpp_workspace/task_data/vqa/gqa/val_balanced_subset_50_per_qtype.jsonl"
             with open(split_path, "r") as f:
                 records = [GqaRecord(**json.loads(line)) for line in f]
+        elif split == "train_100k":
+            split_path = "workspace/experiments__188_ICLR25_rebuttal_prepare_gqa_training_set/gqa_train_100k.jsonl"
+            with open(split_path, "r") as f:
+                records = [GqaRecord(**json.loads(line)) for line in f]
+
     except FileNotFoundError:
         records = load_dataset("codezakh/dataenvgym-gqa-raw", split=split)
         records = cast(Collection[GqaRecord], records)

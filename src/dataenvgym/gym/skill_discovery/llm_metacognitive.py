@@ -26,11 +26,14 @@ import json
 from tqdm.contrib.logging import logging_redirect_tqdm
 from dataenvgym.utils import PydanticJSONLinesReader, PydanticJSONLinesWriter
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
+from typing import Optional
 
 
 class Skill(BaseModel):
     name: str
-    reason_for_skill: str
+    reason_for_skill: Optional[str] = None
 
 
 class InstructionWithSkill(BaseModel):
@@ -155,7 +158,13 @@ class VqaSkillDiscoverer:
         self.label_questions_with_skill_categories_prompt = (
             label_questions_with_skill_categories_prompt
         )
-        self.client = instructor.from_openai(OpenAI())
+        self.client = instructor.patch(
+            AzureOpenAI(
+                api_key=os.environ["AZURE_OPENAI_API_KEY_GPT4O_MINI"],
+                azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT4O_MINI"],
+                api_version="2023-03-15-preview",
+            )
+        )
         self.num_skill_categories = num_skill_categories
 
         self.topic = topic
@@ -180,36 +189,55 @@ class VqaSkillDiscoverer:
         with open(result_path, "w") as f:
             json.dump(self.discovery_result.model_dump(), f)
 
+    def _label_single_task_instance(
+        self, task_instance: OpenEndedVqaTaskInstance | MultipleChoiceVqaTaskInstance
+    ) -> InstructionWithSkill:
+        """Helper method to label a single task instance with a skill."""
+        question = task_instance.instruction
+        prompt = self.question_to_skill_template.render(
+            question=question,
+            topic=self.topic,
+            student_description=self.student_description,
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        skill: Skill = self.client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            response_model=Skill,  # type: ignore
+        )
+        return InstructionWithSkill(
+            instance_id=task_instance.instance_id,
+            instruction=task_instance.instruction,
+            skill=skill,
+        )
+
     def label_task_instances_with_skill(
         self,
         task_instances: (
             Collection[OpenEndedVqaTaskInstance]
             | Collection[MultipleChoiceVqaTaskInstance]
         ),
+        max_workers: int = 4,
     ) -> list[InstructionWithSkill]:
         labeled_instructions: list[InstructionWithSkill] = []
-        for task_instance in tqdm(task_instances):
-            question = task_instance.instruction
-            prompt = self.question_to_skill_template.render(
-                question=question,
-                topic=self.topic,
-                student_description=self.student_description,
-                trim_blocks=True,
-                lstrip_blocks=True,
-            )
-            skill: Skill = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "user", "content": prompt},
-                ],
-                response_model=Skill,
-            )
-            instruction_with_skill = InstructionWithSkill(
-                instance_id=task_instance.instance_id,
-                instruction=task_instance.instruction,
-                skill=skill,
-            )
-            labeled_instructions.append(instruction_with_skill)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_task = {
+                executor.submit(self._label_single_task_instance, task): task
+                for task in task_instances
+            }
+
+            for future in tqdm(as_completed(future_to_task), total=len(task_instances)):
+                try:
+                    labeled_instruction = future.result()
+                    labeled_instructions.append(labeled_instruction)
+                except Exception as e:
+                    task = future_to_task[future]
+                    logger.error(f"Task {task.instance_id} generated an exception: {e}")
+                    raise e
+
         return labeled_instructions
 
     def aggregate_skills_into_categories(
@@ -232,36 +260,67 @@ class VqaSkillDiscoverer:
         )
         return skill_categories
 
+    def _map_single_instruction_to_category(
+        self,
+        instruction: InstructionWithSkill,
+        skill_categories: list[SkillCategory],
+    ) -> tuple[str, SkillCategory]:
+        """Helper method to map a single instruction to a skill category."""
+        skill = instruction.skill.name
+        for category in skill_categories:
+            if skill in category.skills:
+                return instruction.instance_id, category
+
+        # This skill was not assigned to any category
+        with logging_redirect_tqdm():
+            logger.warning(
+                "Skill {} was not assigned to any category, asking the LLM to assign it to a category.",
+                skill,
+            )
+        category_name = (
+            self.ask_llm_skill_category_of_instruction_without_discovery_result(
+                instruction.instruction, list(skill_categories)
+            )
+        )
+        category = next(
+            category
+            for category in skill_categories
+            if category.descriptive_name == category_name
+        )
+        return instruction.instance_id, category
+
     def map_instance_ids_to_skill_categories(
         self,
         labeled_instructions: list[InstructionWithSkill],
         skill_categories: SkillCategories,
+        max_workers: int = 4,
     ) -> dict[str, SkillCategory]:
         instance_id_to_skill_category: dict[str, SkillCategory] = {}
-        for instruction in tqdm(labeled_instructions):
-            skill = instruction.skill.name
-            for category in skill_categories:
-                if skill in category.skills:
-                    instance_id_to_skill_category[instruction.instance_id] = category
-                    break
-            else:
-                # This skill was not assigned to any category. This is not good, but we will do
-                # our best to assign it a skill now.
-                with logging_redirect_tqdm():
-                    logger.warning(
-                        "Skill {} was not assigned to any category, asking the LLM to assign it to a category.",
-                        skill,
+        skill_categories_list = list(skill_categories)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            map_fn = partial(
+                self._map_single_instruction_to_category,
+                skill_categories=skill_categories_list,
+            )
+            future_to_instruction = {
+                executor.submit(map_fn, instruction): instruction
+                for instruction in labeled_instructions
+            }
+
+            for future in tqdm(
+                as_completed(future_to_instruction), total=len(labeled_instructions)
+            ):
+                try:
+                    instance_id, category = future.result()
+                    instance_id_to_skill_category[instance_id] = category
+                except Exception as e:
+                    instruction = future_to_instruction[future]
+                    logger.error(
+                        f"Instruction {instruction.instance_id} generated an exception: {e}"
                     )
-                category_name = (
-                    self.ask_llm_skill_category_of_instruction_without_discovery_result(
-                        instruction.instruction, list(skill_categories)
-                    )
-                )
-                instance_id_to_skill_category[instruction.instance_id] = next(
-                    category
-                    for category in skill_categories
-                    if category.descriptive_name == category_name
-                )
+                    raise e
+
         return instance_id_to_skill_category
 
     def discover_skills(
@@ -333,12 +392,10 @@ class VqaSkillDiscoverer:
         messages = [
             {"role": "user", "content": prompt},
         ]
-        llm_inferred_skill, completion = (
-            self.client.chat.completions.create_with_completion(
-                model="gpt-4o",
-                messages=messages,  # type: ignore
-                response_model=Skill,
-            )
+        llm_inferred_skill = self.client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,  # type: ignore
+            response_model=Skill,
         )
 
         # If the skill is not in the list of categories, ask the LLM to try again.
@@ -353,7 +410,6 @@ class VqaSkillDiscoverer:
                 llm_inferred_skill.name,
                 [category.descriptive_name for category in skill_categories],
             )
-            # messages.append(completion.choices[0].message)
             messages.append(
                 {
                     "role": "user",
@@ -362,12 +418,10 @@ class VqaSkillDiscoverer:
                     ),
                 },
             )
-            llm_inferred_skill, completion = (
-                self.client.chat.completions.create_with_completion(
-                    model="gpt-4o",
-                    messages=messages,  # type: ignore
-                    response_model=Skill,
-                )
+            llm_inferred_skill = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,  # type: ignore
+                response_model=Skill,
             )
 
         raise ValueError(

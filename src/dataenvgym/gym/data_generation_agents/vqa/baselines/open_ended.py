@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Callable, Collection, Literal, Optional, Sequence
+import random
 
 import instructor
 import jinja2
@@ -26,6 +27,7 @@ from dataenvgym.gym.domain_models import (
     implements,
 )
 from dataenvgym.utils import PydanticJSONLinesWriter
+from loguru import logger
 
 DEFAULT_TEMPLATE = jinja2.Template(
     """
@@ -117,7 +119,9 @@ class DataGenerationAgent:
         text_to_image_fn: Callable[[str], SerializableImage] = RandomImageGenerator(),
         logging_folder: Optional[Path] = None,
         model: Literal["gpt-4o", "gpt-4o-mini"] = "gpt-4o",
+        data_generation_per_invocation_limit: Optional[int] = None,
     ):
+        self.data_generation_per_invocation_limit = data_generation_per_invocation_limit
         self.model = model
         if self.model == "gpt-4o":
             self.client = instructor.patch(
@@ -212,12 +216,39 @@ class DataGenerationAgent:
             training_data.extend(self.generate_data_for_error(error))
         return training_data
 
+    def generate_training_data_with_per_invocation_limit(
+        self, completed_task_instances: Collection[CompletedVqaTaskInstance]
+    ) -> Sequence[VqaTrainingDatum]:
+        errors = [_ for _ in completed_task_instances if not _.was_correct]
+        random.shuffle(errors)
+        training_data: list[VqaTrainingDatum] = []
+        for error in tqdm(errors, desc="Generating training data", unit="error"):
+            training_data.extend(self.generate_data_for_error(error))
+            if (
+                self.data_generation_per_invocation_limit
+                and len(training_data) >= self.data_generation_per_invocation_limit
+            ):
+                logger.info(
+                    f"Reached data generation limit of {self.data_generation_per_invocation_limit}. Stopping."
+                )
+                break
+        return training_data
+
     def __call__(
         self,
         completed_task_instances: Collection[CompletedVqaTaskInstance],
         predictor: PredictorInterface[OpenEndedVqaTaskInstance],
     ) -> Sequence[VqaTrainingDatum]:
-        generated_training_data = self.generate_training_data(completed_task_instances)
+        if self.data_generation_per_invocation_limit:
+            generated_training_data = (
+                self.generate_training_data_with_per_invocation_limit(
+                    completed_task_instances
+                )
+            )
+        else:
+            generated_training_data = self.generate_training_data(
+                completed_task_instances
+            )
         return generated_training_data
 
     def step(self) -> None:
