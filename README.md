@@ -124,6 +124,9 @@ See `docs/components.md` for more details on the API.
     - Open-Ended Environment: `examples/livecodebench/open_ended_environment.py`
     - Skill-List Environment: `examples/livecodebench/skill_list_environment.py`
     - Skill-Tree Environment: `examples/livecodebench/skill_tree_environment.py`
+- MnMs (Tool Use)
+    - Open-Ended Environment: `examples/tool_use/open_ended.py`
+    - Skill-List Environment: `examples/tool_use/skill_list.py`
 
 ## Running Examples
 Run the examples from the repository root. Set `CUDA_VISIBLE_DEVICES` to the GPUs you want to use and make sure to set `num_gpus` in `ray.init()` to the number of GPUs you have available.
@@ -140,6 +143,8 @@ This repository uses code from the following repositories:
 - [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
 - [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness)
 - [LiveCodeBench](https://github.com/LiveCodeBench/LiveCodeBench)
+- [MnMs](https://github.com/RAIVNLab/mnms)
+- [NaturalBench](https://github.com/Baiqi-Li/NaturalBench)
 
 We thank the authors of the above repositories for making their code freely available.
 
