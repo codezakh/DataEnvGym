@@ -1,0 +1,38 @@
+ipython                                                                                                 
+pillow==10.4.0                                                                                          
+attrs
+click
+datasets==2.21.0                                                                                        
+diffusers @ git+https://github.com/huggingface/diffusers.git@fbe29c62984c33c6cf9cf7ad120a992fe6d20854   
+gitdb
+huggingface-hub==0.28.1                                                                                 
+hydra-core @ git+https://github.com/facebookresearch/hydra.git@f4fe48442992defef7c2ddd0a6d014e3c371a073 
+icecream
+instructor==1.7.0                                                                                       
+ipdb
+jinja2                                                                                                  
+loguru
+numpy==1.26.4                                                                                           
+omegaconf @ git+https://github.com/omry/omegaconf@6f9656bf091f6cb1ebfe22c926e60e1c9d25ca02              
+openai==1.61.1                                                                                          
+pandas==2.2.2                                                                                           
+Pebble                                                                                                  
+peft==0.12.0                                                                                            
+pydantic==2.10.6                                                                                        
+pyext==0.7                                                                                              
+ray                                                                                                     
+rich
+seaborn
+sh                                                                                                      
+scikit-learn                                                                                            
+SQLAlchemy                                                                                  
+sympy                                                                                                   
+tenacity                                                                                                
+tqdm
+transformers==4.44.2                                                                                    
+trl @ git+https://github.com/huggingface/trl.git@ac7c8b128494dc98db3c795c728da3bf7abed981               
+typing_extensions                                                                                       
+python-ulid                                                                                             
+vllm==0.6.0                                                                                             
+-e src/external/LLaMA-Factory
+-e .
