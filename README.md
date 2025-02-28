@@ -27,8 +27,8 @@ uv sync requirements.txt
 ```
 This will install `dataenvgym` as a Python module, so you can do `import dataenvgym`.
 
-The flag `--config-settings editable_mode=compat` is required for type-checking due to a change in the way editable installs are handled in recent versions of setuptools.
-If you don't care about type-checking, you can ignore the flag.
+If you are using VSCode and linting doesn't work against `dataenvgym`, try doing `pip install  -e . --config-settings editable_mode=compat --force-reinstall`. This is required for type-checking due to a change in the way editable installs are handled in recent versions of setuptools.
+If you don't care about type-checking, you can ignore this.
 
 ## API Keys
 If using Azure OpenAI, set the following environment variables:
@@ -39,7 +39,11 @@ If using OpenAI, set the following environment variable:
 - `OPENAI_API_KEY`
 
 ## Datasets
-Datasets used for the paper will be automatically downloaded by HuggingFace Datasets.
+Datasets used for the paper will be automatically downloaded by HuggingFace Datasets. 
+
+### Known Issues
+
+[MATH](https://github.com/huggingface/lighteval/issues/494) is no longer available on HuggingFace from `lighteval/MATH`. 
 
 ## A Minimal Example
 Here is a simplified example that uses each high-level component of `DataEnvGym` to run an episode in which a data generation agent tries to improve a `gemma-2-2b-it` student model on the MATH dataset.
