@@ -22,9 +22,8 @@ Useful features:
 git clone https://github.com/codezakh/dataenvgym.git && cd dataenvgym
 conda create -n dataenvgym python=3.10
 conda activate dataenvgym
-pip install -r requirements.txt
-pip install -e src/external/LLaMA-Factory --config-settings editable_mode=compat
-pip install -e . --config-settings editable_mode=compat
+pip install uv
+uv sync requirements.txt
 ```
 This will install `dataenvgym` as a Python module, so you can do `import dataenvgym`.
 
@@ -45,7 +44,7 @@ Datasets used for the paper will be automatically downloaded by HuggingFace Data
 ## A Minimal Example
 Here is a simplified example that uses each high-level component of `DataEnvGym` to run an episode in which a data generation agent tries to improve a `gemma-2-2b-it` student model on the MATH dataset.
 
-This example should be immediately runnable after installing the requirements. 
+This example should be immediately runnable after installing the requirements.   
 
 ```python
 from pathlib import Path
@@ -110,6 +109,8 @@ performance_history = run_episode(
 )
 ```
 See `docs/components.md` for more details on the API.
+
+Note: This assumes you're using the Azure OpenAI API. If you aren't, set `.client` on the data generation agent to the client you want (e.g. OpenAI).
 
 # Examples
 - GQA
